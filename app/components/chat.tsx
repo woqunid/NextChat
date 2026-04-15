@@ -44,7 +44,6 @@ import RobotIcon from "../icons/robot.svg";
 import SizeIcon from "../icons/size.svg";
 import QualityIcon from "../icons/hd.svg";
 import StyleIcon from "../icons/palette.svg";
-import PluginIcon from "../icons/plugin.svg";
 import ShortcutkeyIcon from "../icons/shortcutkey.svg";
 import McpToolIcon from "../icons/tool.svg";
 import HeadphoneIcon from "../icons/headphone.svg";
@@ -59,7 +58,6 @@ import {
   useAccessStore,
   useAppConfig,
   useChatStore,
-  usePluginStore,
 } from "../store";
 
 import {
@@ -74,7 +72,6 @@ import {
   supportsCustomSize,
   useMobileScreen,
   selectOrCopy,
-  showPlugins,
 } from "../utils";
 
 import { uploadImage as uploadImageRemote } from "@/app/utils/chat";
@@ -507,7 +504,6 @@ export function ChatActions(props: {
   const config = useAppConfig();
   const navigate = useNavigate();
   const chatStore = useChatStore();
-  const pluginStore = usePluginStore();
   const session = chatStore.currentSession();
 
   // switch themes
@@ -553,7 +549,6 @@ export function ChatActions(props: {
     return model?.displayName ?? "";
   }, [models, currentModel, currentProviderName]);
   const [showModelSelector, setShowModelSelector] = useState(false);
-  const [showPluginSelector, setShowPluginSelector] = useState(false);
   const [showUploadImage, setShowUploadImage] = useState(false);
 
   const [showSizeSelector, setShowSizeSelector] = useState(false);
@@ -795,35 +790,7 @@ export function ChatActions(props: {
           />
         )}
 
-        {showPlugins(currentProviderName, currentModel) && (
-          <ChatAction
-            onClick={() => {
-              if (pluginStore.getAll().length == 0) {
-                navigate(Path.Plugins);
-              } else {
-                setShowPluginSelector(true);
-              }
-            }}
-            text={Locale.Plugin.Name}
-            icon={<PluginIcon />}
-          />
-        )}
-        {showPluginSelector && (
-          <Selector
-            multiple
-            defaultSelectedValue={chatStore.currentSession().mask?.plugin}
-            items={pluginStore.getAll().map((item) => ({
-              title: `${item?.title}@${item?.version}`,
-              value: item?.id,
-            }))}
-            onClose={() => setShowPluginSelector(false)}
-            onSelection={(s) => {
-              chatStore.updateTargetSession(session, (session) => {
-                session.mask.plugin = s as string[];
-              });
-            }}
-          />
-        )}
+
 
         {!isMobileScreen && (
           <ChatAction
