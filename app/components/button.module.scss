@@ -46,6 +46,10 @@
   &:focus {
     border-color: var(--primary);
   }
+
+  &:active {
+    transform: scale(0.95);
+  }
 }
 
 .shadow {

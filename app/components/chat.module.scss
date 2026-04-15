@@ -296,6 +296,7 @@
   padding-bottom: 40px;
   position: relative;
   overscroll-behavior: none;
+  scroll-behavior: smooth;
 }
 
 .chat-body-main-title {
@@ -438,7 +439,7 @@
   box-sizing: border-box;
   max-width: 100%;
   margin-top: 10px;
-  border-radius: 10px;
+  border-radius: 16px;
   background-color: rgba(0, 0, 0, 0.05);
   padding: 10px;
   font-size: 14px;
@@ -627,7 +628,7 @@
   cursor: text;
   display: flex;
   flex: 1;
-  border-radius: 10px;
+  border-radius: 16px;
   border: var(--border-in-light);
 }
 
@@ -642,7 +643,7 @@
 .chat-input {
   height: 100%;
   width: 100%;
-  border-radius: 10px;
+  border-radius: 16px;
   border: none;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.03);
   background-color: var(--white);
