@@ -1,4 +1,5 @@
 import {
+  getMessageTextContentForModel,
   getMessageTextContent,
   isDalle3,
   safeLocalStorage,
@@ -9,6 +10,7 @@ import { indexedDBStorage } from "@/app/utils/indexedDB-storage";
 import { nanoid } from "nanoid";
 import type {
   ClientApi,
+  DocumentAttachment,
   MultimodalContent,
   RequestMessage,
 } from "../client/api";
@@ -38,6 +40,7 @@ import { collectModelsWithDefaultModel } from "../utils/model";
 import { createEmptyMask, Mask } from "./mask";
 import { executeMcpAction, getAllTools, isMcpEnabled } from "../mcp/actions";
 import { extractMcpJson, isMcpJson } from "../mcp/utils";
+import { appendDocumentsToMessage } from "../utils/document";
 
 const localStorage = safeLocalStorage();
 
@@ -153,7 +156,7 @@ function getSummarizeModel(
 
 function countMessages(msgs: ChatMessage[]) {
   return msgs.reduce(
-    (pre, cur) => pre + estimateTokenLength(getMessageTextContent(cur)),
+    (pre, cur) => pre + estimateTokenLength(getMessageTextContentForModel(cur)),
     0,
   );
 }
@@ -408,6 +411,7 @@ export const useChatStore = createPersistStore(
         content: string,
         attachImages?: string[],
         isMcpResponse?: boolean,
+        attachDocuments?: DocumentAttachment[],
       ) {
         const session = get().currentSession();
         const modelConfig = session.mask.modelConfig;
@@ -430,6 +434,7 @@ export const useChatStore = createPersistStore(
         let userMessage: ChatMessage = createMessage({
           role: "user",
           content: mContent,
+          documents: attachDocuments,
           isMcpResponse,
         });
 
@@ -441,7 +446,9 @@ export const useChatStore = createPersistStore(
 
         // get recent messages
         const recentMessages = await get().getMessagesWithMemory();
-        const sendMessages = recentMessages.concat(userMessage);
+        const sendMessages = recentMessages
+          .concat(userMessage)
+          .map((message) => appendDocumentsToMessage(message));
         const messageIndex = session.messages.length + 1;
 
         // save user's and bot's message
@@ -625,7 +632,7 @@ export const useChatStore = createPersistStore(
         ) {
           const msg = messages[i];
           if (!msg || msg.isError) continue;
-          tokenCount += estimateTokenLength(getMessageTextContent(msg));
+          tokenCount += estimateTokenLength(getMessageTextContentForModel(msg));
           reversedRecentMessages.push(msg);
         }
         // concat all messages
@@ -798,7 +805,8 @@ export const useChatStore = createPersistStore(
 
       updateStat(message: ChatMessage, session: ChatSession) {
         get().updateTargetSession(session, (session) => {
-          session.stat.charCount += message.content.length;
+          session.stat.charCount +=
+            getMessageTextContentForModel(message).length;
           // TODO: should update chat count and word count
         });
       },

@@ -3,6 +3,8 @@ declare module "*.png";
 declare module "*.woff2";
 declare module "*.woff";
 declare module "*.ttf";
+declare module "mammoth/mammoth.browser";
+declare module "pdfjs-dist/webpack.mjs";
 declare module "*.scss" {
   const content: Record<string, string>;
   export default content;

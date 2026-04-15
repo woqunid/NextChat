@@ -81,6 +81,14 @@ const cn = {
       Clear: "清除聊天",
       Settings: "对话设置",
       UploadImage: "上传图片",
+      UploadFile: "上传文档",
+    },
+    Documents: {
+      Attached: (count: number) => `已添加 ${count} 个文档`,
+      ParseError: (name: string) => `解析文档失败：${name}`,
+      Truncated: (name: string) => `文档过长，已截断：${name}`,
+      Limit: (count: number) => `最多只能附加 ${count} 个文档`,
+      CharacterCount: (count: number) => `${count} 字`,
     },
     Rename: "重命名对话",
     Typing: "正在输入…",
@@ -864,8 +872,8 @@ const cn = {
 
 type DeepPartial<T> = T extends object
   ? {
-    [P in keyof T]?: DeepPartial<T[P]>;
-  }
+      [P in keyof T]?: DeepPartial<T[P]>;
+    }
   : T;
 
 export type LocaleType = typeof cn;

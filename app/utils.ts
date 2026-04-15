@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { showToast } from "./components/ui-lib";
 import Locale from "./locales";
-import { RequestMessage } from "./client/api";
+import { DocumentAttachment, RequestMessage } from "./client/api";
 import {
   REQUEST_TIMEOUT_MS,
   REQUEST_TIMEOUT_MS_FOR_THINKING,
@@ -12,6 +12,7 @@ import { fetch as tauriStreamFetch } from "./utils/stream";
 import { VISION_MODEL_REGEXES, EXCLUDE_VISION_MODEL_REGEXES } from "./constant";
 import { useAccessStore } from "./store";
 import { ModelSize } from "./typing";
+import { appendDocumentsToMessage } from "./utils/document";
 
 export function trimTopic(topic: string) {
   // Fix an issue where double quotes still show in the Indonesian language
@@ -245,6 +246,10 @@ export function getMessageTextContent(message: RequestMessage) {
   return "";
 }
 
+export function getMessageTextContentForModel(message: RequestMessage) {
+  return getMessageTextContent(appendDocumentsToMessage(message));
+}
+
 export function getMessageTextContentWithoutThinking(message: RequestMessage) {
   let content = "";
 
@@ -278,6 +283,12 @@ export function getMessageImages(message: RequestMessage): string[] {
     }
   }
   return urls;
+}
+
+export function getMessageDocuments(
+  message: RequestMessage,
+): DocumentAttachment[] {
+  return message.documents ?? [];
 }
 
 export function isVisionModel(model: string) {

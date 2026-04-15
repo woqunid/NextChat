@@ -34,6 +34,7 @@ import ConfirmIcon from "../icons/confirm.svg";
 import CloseIcon from "../icons/close.svg";
 import CancelIcon from "../icons/cancel.svg";
 import ImageIcon from "../icons/image.svg";
+import UploadIcon from "../icons/upload.svg";
 
 import LightIcon from "../icons/light.svg";
 import DarkIcon from "../icons/dark.svg";
@@ -63,6 +64,7 @@ import {
 import {
   autoGrowTextArea,
   copyToClipboard,
+  getMessageDocuments,
   getMessageImages,
   getMessageTextContent,
   isDalle3,
@@ -75,6 +77,11 @@ import {
 } from "../utils";
 
 import { uploadImage as uploadImageRemote } from "@/app/utils/chat";
+import {
+  MAX_ATTACH_DOCUMENTS,
+  isSupportedDocumentFile,
+  parseDocumentFile,
+} from "@/app/utils/document";
 
 import dynamic from "next/dynamic";
 
@@ -113,7 +120,11 @@ import { prettyObject } from "../utils/format";
 import { ExportMessageModal } from "./exporter";
 import { getClientConfig } from "../config/client";
 import { useAllModels } from "../utils/hooks";
-import { ClientApi, MultimodalContent } from "../client/api";
+import {
+  ClientApi,
+  DocumentAttachment,
+  MultimodalContent,
+} from "../client/api";
 import { createTTSPlayer } from "../utils/audio";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "../utils/ms_edge_tts";
 
@@ -490,6 +501,7 @@ function useScrollToBottom(
 
 export function ChatActions(props: {
   uploadImage: () => void;
+  uploadDocument: () => void;
   setAttachImages: (images: string[]) => void;
   setUploading: (uploading: boolean) => void;
   showPromptModal: () => void;
@@ -497,6 +509,7 @@ export function ChatActions(props: {
   showPromptHints: () => void;
   hitBottom: boolean;
   uploading: boolean;
+  parsingDocuments: boolean;
   setShowShortcutKeyModal: React.Dispatch<React.SetStateAction<boolean>>;
   setUserInput: (input: string) => void;
   setShowChatSidePanel: React.Dispatch<React.SetStateAction<boolean>>;
@@ -540,14 +553,18 @@ export function ChatActions(props: {
       return filteredModels;
     }
   }, [allModels]);
-  const currentModelName = useMemo(() => {
-    const model = models.find(
-      (m) =>
-        m.name == currentModel &&
-        m?.provider?.providerName == currentProviderName,
+  const currentModelInfo = useMemo(() => {
+    return (
+      models.find(
+        (m) =>
+          m.name == currentModel &&
+          m?.provider?.providerName == currentProviderName,
+      ) ?? models.find((m) => m.name == currentModel)
     );
-    return model?.displayName ?? "";
   }, [models, currentModel, currentProviderName]);
+  const currentModelName = useMemo(() => {
+    return currentModelInfo?.displayName ?? currentModel ?? "";
+  }, [currentModelInfo, currentModel]);
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [showUploadImage, setShowUploadImage] = useState(false);
 
@@ -574,10 +591,21 @@ export function ChatActions(props: {
 
     // if current model is not available
     // switch to first available model
-    const isUnavailableModel = !models.some((m) => m.name === currentModel);
+    const isUnavailableModel = !models.some(
+      (m) =>
+        m.name === currentModel &&
+        m?.provider?.providerName === currentProviderName,
+    );
     if (isUnavailableModel && models.length > 0) {
       // show next model to default model if exist
-      let nextModel = models.find((model) => model.isDefault) || models[0];
+      let nextModel =
+        models.find(
+          (model) =>
+            model.name === currentModel ||
+            model?.provider?.providerName === currentProviderName,
+        ) ||
+        models.find((model) => model.isDefault) ||
+        models[0];
       chatStore.updateTargetSession(session, (session) => {
         session.mask.modelConfig.model = nextModel.name;
         session.mask.modelConfig.providerName = nextModel?.provider
@@ -623,6 +651,11 @@ export function ChatActions(props: {
             icon={props.uploading ? <LoadingButtonIcon /> : <ImageIcon />}
           />
         )}
+        <ChatAction
+          onClick={props.uploadDocument}
+          text={Locale.Chat.InputActions.UploadFile}
+          icon={props.parsingDocuments ? <LoadingButtonIcon /> : <UploadIcon />}
+        />
         <ChatAction
           onClick={nextTheme}
           text={Locale.Chat.InputActions.Theme[theme]}
@@ -789,8 +822,6 @@ export function ChatActions(props: {
             }}
           />
         )}
-
-
 
         {!isMobileScreen && (
           <ChatAction
@@ -999,7 +1030,11 @@ function _Chat() {
   const isMobileScreen = useMobileScreen();
   const navigate = useNavigate();
   const [attachImages, setAttachImages] = useState<string[]>([]);
+  const [attachDocuments, setAttachDocuments] = useState<DocumentAttachment[]>(
+    [],
+  );
   const [uploading, setUploading] = useState(false);
+  const [parsingDocuments, setParsingDocuments] = useState(false);
 
   // prompt hints
   const promptStore = usePromptStore();
@@ -1070,7 +1105,13 @@ function _Chat() {
   };
 
   const doSubmit = (userInput: string) => {
-    if (userInput.trim() === "" && isEmpty(attachImages)) return;
+    if (
+      userInput.trim() === "" &&
+      isEmpty(attachImages) &&
+      isEmpty(attachDocuments)
+    ) {
+      return;
+    }
     const matchCommand = chatCommands.match(userInput);
     if (matchCommand.matched) {
       setUserInput("");
@@ -1080,9 +1121,10 @@ function _Chat() {
     }
     setIsLoading(true);
     chatStore
-      .onUserInput(userInput, attachImages)
+      .onUserInput(userInput, attachImages, false, attachDocuments)
       .then(() => setIsLoading(false));
     setAttachImages([]);
+    setAttachDocuments([]);
     chatStore.setLastInput(userInput);
     setUserInput("");
     setPromptHints([]);
@@ -1233,7 +1275,10 @@ function _Chat() {
     setIsLoading(true);
     const textContent = getMessageTextContent(userMessage);
     const images = getMessageImages(userMessage);
-    chatStore.onUserInput(textContent, images).then(() => setIsLoading(false));
+    const documents = getMessageDocuments(userMessage);
+    chatStore
+      .onUserInput(textContent, images, false, documents)
+      .then(() => setIsLoading(false));
     inputRef.current?.focus();
   };
 
@@ -1479,81 +1524,70 @@ function _Chat() {
   const handlePaste = useCallback(
     async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const currentModel = chatStore.currentSession().mask.modelConfig.model;
-      if (!isVisionModel(currentModel)) {
+      const items = (event.clipboardData || window.clipboardData).items;
+      const files = Array.from(items)
+        .filter((item) => item.kind === "file")
+        .map((item) => item.getAsFile())
+        .filter(Boolean) as File[];
+
+      if (files.length === 0) {
         return;
       }
-      const items = (event.clipboardData || window.clipboardData).items;
-      for (const item of items) {
-        if (item.kind === "file" && item.type.startsWith("image/")) {
-          event.preventDefault();
-          const file = item.getAsFile();
-          if (file) {
-            const images: string[] = [];
-            images.push(...attachImages);
-            images.push(
-              ...(await new Promise<string[]>((res, rej) => {
-                setUploading(true);
-                const imagesData: string[] = [];
-                uploadImageRemote(file)
-                  .then((dataUrl) => {
-                    imagesData.push(dataUrl);
-                    setUploading(false);
-                    res(imagesData);
-                  })
-                  .catch((e) => {
-                    setUploading(false);
-                    rej(e);
-                  });
-              })),
-            );
-            const imagesLength = images.length;
 
-            if (imagesLength > 3) {
-              images.splice(3, imagesLength - 3);
-            }
-            setAttachImages(images);
-          }
-        }
+      const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+      const documentFiles = files.filter((file) =>
+        isSupportedDocumentFile(file),
+      );
+      const shouldHandleImages =
+        imageFiles.length > 0 && isVisionModel(currentModel);
+      const shouldHandleDocuments = documentFiles.length > 0;
+
+      if (!shouldHandleImages && !shouldHandleDocuments) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (shouldHandleImages) {
+        await appendImagesFromFiles(imageFiles);
+      }
+
+      if (shouldHandleDocuments) {
+        await appendDocumentsFromFiles(documentFiles);
       }
     },
-    [attachImages, chatStore],
+    [attachDocuments, attachImages, chatStore],
   );
 
-  async function uploadImage() {
+  async function appendImagesFromFiles(files: File[]) {
+    if (files.length === 0) return;
+
     const images: string[] = [];
     images.push(...attachImages);
 
     images.push(
       ...(await new Promise<string[]>((res, rej) => {
-        const fileInput = document.createElement("input");
-        fileInput.type = "file";
-        fileInput.accept =
-          "image/png, image/jpeg, image/webp, image/heic, image/heif";
-        fileInput.multiple = true;
-        fileInput.onchange = (event: any) => {
-          setUploading(true);
-          const files = event.target.files;
-          const imagesData: string[] = [];
-          for (let i = 0; i < files.length; i++) {
-            const file = event.target.files[i];
-            uploadImageRemote(file)
-              .then((dataUrl) => {
-                imagesData.push(dataUrl);
-                if (
-                  imagesData.length === 3 ||
-                  imagesData.length === files.length
-                ) {
-                  setUploading(false);
-                  res(imagesData);
-                }
-              })
-              .catch((e) => {
+        setUploading(true);
+        const imagesData: string[] = [];
+        const pendingFiles = files.slice(0, 3);
+        for (let i = 0; i < pendingFiles.length; i++) {
+          const file = pendingFiles[i];
+          uploadImageRemote(file)
+            .then((dataUrl) => {
+              imagesData.push(dataUrl);
+              if (
+                imagesData.length === 3 ||
+                imagesData.length === pendingFiles.length
+              ) {
                 setUploading(false);
-                rej(e);
-              });
-          }
-        };
-        fileInput.click();
+                res(imagesData);
+              }
+            })
+            .catch((e) => {
+              setUploading(false);
+              rej(e);
+            });
+        }
       })),
     );
 
@@ -1562,6 +1596,80 @@ function _Chat() {
       images.splice(3, imagesLength - 3);
     }
     setAttachImages(images);
+  }
+
+  async function uploadImage() {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept =
+      "image/png, image/jpeg, image/webp, image/heic, image/heif";
+    fileInput.multiple = true;
+    fileInput.onchange = async (event: any) => {
+      const files = Array.from(event.target.files ?? []) as File[];
+      await appendImagesFromFiles(files);
+    };
+    fileInput.click();
+  }
+
+  async function appendDocumentsFromFiles(files: File[]) {
+    if (files.length === 0) return;
+
+    if (attachDocuments.length >= MAX_ATTACH_DOCUMENTS) {
+      showToast(Locale.Chat.Documents.Limit(MAX_ATTACH_DOCUMENTS));
+      return;
+    }
+
+    setParsingDocuments(true);
+    const nextDocuments = [...attachDocuments];
+    let addedCount = 0;
+
+    try {
+      for (const file of files) {
+        if (nextDocuments.length >= MAX_ATTACH_DOCUMENTS) {
+          showToast(Locale.Chat.Documents.Limit(MAX_ATTACH_DOCUMENTS));
+          break;
+        }
+
+        try {
+          const document = await parseDocumentFile(file);
+          const existed = nextDocuments.some((item) => item.id === document.id);
+          if (existed) {
+            continue;
+          }
+
+          nextDocuments.push(document);
+          addedCount += 1;
+
+          if (document.truncated) {
+            showToast(Locale.Chat.Documents.Truncated(document.name));
+          }
+        } catch (error) {
+          console.error("[Document Upload]", error);
+          showToast(Locale.Chat.Documents.ParseError(file.name));
+        }
+      }
+    } finally {
+      setAttachDocuments(nextDocuments);
+      setParsingDocuments(false);
+    }
+
+    if (addedCount > 0) {
+      showToast(Locale.Chat.Documents.Attached(addedCount));
+    }
+  }
+
+  async function uploadDocument() {
+    const fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept =
+      ".txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    fileInput.multiple = true;
+    fileInput.onchange = async (event: any) => {
+      const files = Array.from(event.target.files ?? []) as File[];
+      await appendDocumentsFromFiles(files);
+    };
+
+    fileInput.click();
   }
 
   // 快捷键 shortcut keys
@@ -1987,6 +2095,24 @@ function _Chat() {
                                 )}
                               </div>
                             )}
+                            {getMessageDocuments(message).length > 0 && (
+                              <div className={styles["chat-message-documents"]}>
+                                {getMessageDocuments(message).map(
+                                  (document) => {
+                                    return (
+                                      <div
+                                        key={document.id}
+                                        className={
+                                          styles["chat-message-document"]
+                                        }
+                                      >
+                                        {document.name}
+                                      </div>
+                                    );
+                                  },
+                                )}
+                              </div>
+                            )}
                           </div>
                           {message?.audio_url && (
                             <div className={styles["chat-message-audio"]}>
@@ -2014,12 +2140,14 @@ function _Chat() {
 
               <ChatActions
                 uploadImage={uploadImage}
+                uploadDocument={uploadDocument}
                 setAttachImages={setAttachImages}
                 setUploading={setUploading}
                 showPromptModal={() => setShowPromptModal(true)}
                 scrollToBottom={scrollToBottom}
                 hitBottom={hitBottom}
                 uploading={uploading}
+                parsingDocuments={parsingDocuments}
                 showPromptHints={() => {
                   // Click again to close
                   if (promptHints.length > 0) {
@@ -2038,7 +2166,7 @@ function _Chat() {
               <label
                 className={clsx(styles["chat-input-panel-inner"], {
                   [styles["chat-input-panel-inner-attach"]]:
-                    attachImages.length !== 0,
+                    attachImages.length !== 0 || attachDocuments.length !== 0,
                 })}
                 htmlFor="chat-input"
               >
@@ -2060,27 +2188,66 @@ function _Chat() {
                     fontFamily: config.fontFamily,
                   }}
                 />
-                {attachImages.length != 0 && (
-                  <div className={styles["attach-images"]}>
-                    {attachImages.map((image, index) => {
-                      return (
-                        <div
-                          key={index}
-                          className={styles["attach-image"]}
-                          style={{ backgroundImage: `url("${image}")` }}
-                        >
-                          <div className={styles["attach-image-mask"]}>
-                            <DeleteImageButton
-                              deleteImage={() => {
-                                setAttachImages(
-                                  attachImages.filter((_, i) => i !== index),
-                                );
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                {(attachDocuments.length !== 0 ||
+                  attachImages.length !== 0) && (
+                  <div className={styles["attach-previews"]}>
+                    {attachDocuments.length !== 0 && (
+                      <div className={styles["attach-files"]}>
+                        {attachDocuments.map((document, index) => {
+                          return (
+                            <div
+                              key={document.id}
+                              className={styles["attach-file"]}
+                            >
+                              <div className={styles["attach-file-info"]}>
+                                <div className={styles["attach-file-name"]}>
+                                  {document.name}
+                                </div>
+                                <div className={styles["attach-file-meta"]}>
+                                  {Locale.Chat.Documents.CharacterCount(
+                                    document.charCount,
+                                  )}
+                                </div>
+                              </div>
+                              <DeleteImageButton
+                                deleteImage={() => {
+                                  setAttachDocuments(
+                                    attachDocuments.filter(
+                                      (_, i) => i !== index,
+                                    ),
+                                  );
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {attachImages.length != 0 && (
+                      <div className={styles["attach-images"]}>
+                        {attachImages.map((image, index) => {
+                          return (
+                            <div
+                              key={index}
+                              className={styles["attach-image"]}
+                              style={{ backgroundImage: `url("${image}")` }}
+                            >
+                              <div className={styles["attach-image-mask"]}>
+                                <DeleteImageButton
+                                  deleteImage={() => {
+                                    setAttachImages(
+                                      attachImages.filter(
+                                        (_, i) => i !== index,
+                                      ),
+                                    );
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
                 <IconButton

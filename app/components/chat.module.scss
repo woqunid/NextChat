@@ -1,10 +1,53 @@
 @import "../styles/animation.scss";
 
 .attach-images {
-  position: absolute;
-  left: 30px;
-  bottom: 32px;
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.attach-previews {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 90px 14px 14px;
+}
+
+.attach-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attach-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 10px;
+  border: rgba($color: #888, $alpha: 0.2) 1px solid;
+  border-radius: 10px;
+  background-color: var(--white);
+  box-shadow: var(--card-shadow);
+}
+
+.attach-file-info {
+  min-width: 0;
+}
+
+.attach-file-name {
+  font-size: 12px;
+  color: var(--black);
+  max-width: 240px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.attach-file-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.6;
 }
 
 .attach-image {
@@ -13,7 +56,6 @@
   height: 64px;
   border: rgba($color: #888, $alpha: 0.2) 1px solid;
   border-radius: 5px;
-  margin-right: 10px;
   background-size: cover;
   background-position: center;
   background-color: var(--white);
@@ -497,6 +539,21 @@
   border: rgba($color: #888, $alpha: 0.2) 1px solid;
 }
 
+.chat-message-documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.chat-message-document {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: var(--border-in-light);
+  background-color: var(--white);
+}
+
 @media only screen and (max-width: 600px) {
   $calc-image-width: calc(100vw / 3 * 2 / var(--image-count));
 
@@ -627,13 +684,15 @@
 .chat-input-panel-inner {
   cursor: text;
   display: flex;
+  flex-direction: column;
   flex: 1;
+  position: relative;
   border-radius: 16px;
   border: var(--border-in-light);
 }
 
 .chat-input-panel-inner-attach {
-  padding-bottom: 80px;
+  padding-bottom: 0;
 }
 
 .chat-input-panel-inner:has(.chat-input:focus) {
@@ -664,8 +723,8 @@
   color: white;
 
   position: absolute;
-  right: 30px;
-  bottom: 32px;
+  right: 16px;
+  bottom: 16px;
 }
 
 @media only screen and (max-width: 600px) {
@@ -674,7 +733,7 @@
   }
 
   .chat-input-send {
-    bottom: 30px;
+    bottom: 14px;
   }
 }
 
