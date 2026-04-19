@@ -145,6 +145,7 @@ const DEFAULT_ACCESS_STATE = {
   hideBalanceQuery: false,
   disableGPT4: false,
   disableFastLink: false,
+  hasServerApiKey: false,
   customModels: "",
   defaultModel: "",
   visionModels: "",
@@ -226,6 +227,34 @@ export const useAccessStore = createPersistStore(
       return ensure(get(), ["siliconflowApiKey"]);
     },
 
+    hasCustomConfigApiKey() {
+      if (!get().useCustomConfig) {
+        return false;
+      }
+
+      return (
+        this.isValidOpenAI() ||
+        this.isValidAzure() ||
+        this.isValidGoogle() ||
+        this.isValidAnthropic() ||
+        this.isValidBaidu() ||
+        this.isValidByteDance() ||
+        this.isValidAlibaba() ||
+        this.isValidTencent() ||
+        this.isValidMoonshot() ||
+        this.isValidIflytek() ||
+        this.isValidDeepSeek() ||
+        this.isValidXAI() ||
+        this.isValidChatGLM() ||
+        this.isValidSiliconFlow() ||
+        ensure(get(), ["ai302ApiKey"])
+      );
+    },
+
+    hasConfiguredModelAccess() {
+      return get().hasServerApiKey || this.hasCustomConfigApiKey();
+    },
+
     isAuthorized() {
       this.fetch();
 
@@ -245,6 +274,7 @@ export const useAccessStore = createPersistStore(
         this.isValidXAI() ||
         this.isValidChatGLM() ||
         this.isValidSiliconFlow() ||
+        ensure(get(), ["ai302ApiKey"]) ||
         !this.enabledAccessControl() ||
         (this.enabledAccessControl() && ensure(get(), ["accessCode"]))
       );

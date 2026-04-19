@@ -48,6 +48,25 @@ export function getModelProvider(modelWithProvider: string): [string, string?] {
   return [model, provider];
 }
 
+export function normalizeCustomModels(customModels: string) {
+  const normalized = customModels
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .join(",");
+
+  if (!normalized) {
+    return "";
+  }
+
+  const hasAllRule = normalized.split(",").some((item) => {
+    const [name] = item.replace(/^[-+]/, "").split("=");
+    return name === "all";
+  });
+
+  return hasAllRule ? normalized : `-all,${normalized}`;
+}
+
 export function collectModelTable(
   models: readonly LLMModel[],
   customModels: string,

@@ -1029,6 +1029,7 @@ function _Chat() {
   const [hitBottom, setHitBottom] = useState(true);
   const isMobileScreen = useMobileScreen();
   const navigate = useNavigate();
+  const availableModels = useAllModels().filter((m) => m.available);
   const [attachImages, setAttachImages] = useState<string[]>([]);
   const [attachDocuments, setAttachDocuments] = useState<DocumentAttachment[]>(
     [],
@@ -1105,6 +1106,11 @@ function _Chat() {
   };
 
   const doSubmit = (userInput: string) => {
+    if (availableModels.length === 0) {
+      showToast("请先在 .env 中配置 CUSTOM_MODELS，并提供可用的 API Key");
+      return;
+    }
+
     if (
       userInput.trim() === "" &&
       isEmpty(attachImages) &&

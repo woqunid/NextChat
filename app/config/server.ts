@@ -1,6 +1,6 @@
 import md5 from "spark-md5";
 import { DEFAULT_MODELS, DEFAULT_GA_ID } from "../constant";
-import { isGPT4Model } from "../utils/model";
+import { isGPT4Model, normalizeCustomModels } from "../utils/model";
 
 declare global {
   namespace NodeJS {
@@ -137,7 +137,7 @@ export const getServerSideConfig = () => {
   }
 
   const disableGPT4 = !!process.env.DISABLE_GPT4;
-  let customModels = process.env.CUSTOM_MODELS ?? "";
+  let customModels = normalizeCustomModels(process.env.CUSTOM_MODELS ?? "");
   let defaultModel = process.env.DEFAULT_MODEL ?? "";
   let visionModels = process.env.VISION_MODELS ?? "";
 
@@ -264,6 +264,22 @@ export const getServerSideConfig = () => {
 
     proxyUrl: process.env.PROXY_URL,
     isVercel: !!process.env.VERCEL,
+    hasServerApiKey:
+      !!process.env.OPENAI_API_KEY ||
+      (!!process.env.AZURE_URL && !!process.env.AZURE_API_KEY) ||
+      !!process.env.GOOGLE_API_KEY ||
+      !!process.env.ANTHROPIC_API_KEY ||
+      (!!process.env.BAIDU_API_KEY && !!process.env.BAIDU_SECRET_KEY) ||
+      !!process.env.BYTEDANCE_API_KEY ||
+      !!process.env.ALIBABA_API_KEY ||
+      (!!process.env.TENCENT_SECRET_ID && !!process.env.TENCENT_SECRET_KEY) ||
+      !!process.env.MOONSHOT_API_KEY ||
+      (!!process.env.IFLYTEK_API_KEY && !!process.env.IFLYTEK_API_SECRET) ||
+      !!process.env.DEEPSEEK_API_KEY ||
+      !!process.env.XAI_API_KEY ||
+      !!process.env.CHATGLM_API_KEY ||
+      !!process.env.SILICONFLOW_API_KEY ||
+      !!process.env.AI302_API_KEY,
 
     hideUserApiKey: !!process.env.HIDE_USER_API_KEY,
     disableGPT4,
