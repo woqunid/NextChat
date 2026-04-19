@@ -276,7 +276,8 @@ export class ChatGPTApi implements LLMApi {
       let chatPath = "";
       if (modelConfig.providerName === ServiceProvider.Azure) {
         // find model, and get displayName as deployName
-        const { models: configModels } = useAppConfig.getState();
+        const { models: configModels, customModels: configCustomModels } =
+          useAppConfig.getState();
         const {
           defaultModel,
           customModels: accessCustomModels,
@@ -284,7 +285,9 @@ export class ChatGPTApi implements LLMApi {
         } = useAccessStore.getState();
         const models = collectModelsWithDefaultModel(
           configModels,
-          normalizeCustomModels(accessCustomModels),
+          normalizeCustomModels(
+            useCustomConfig ? configCustomModels : accessCustomModels,
+          ),
           defaultModel,
         );
         const model = models.find(

@@ -1107,7 +1107,11 @@ function _Chat() {
 
   const doSubmit = (userInput: string) => {
     if (availableModels.length === 0) {
-      showToast("请先在 .env 中配置 CUSTOM_MODELS，并提供可用的 API Key");
+      showToast(
+        accessStore.useCustomConfig
+          ? "请先填写自定义模型名，并提供可用的 API Key"
+          : "请先在 .env 中配置 CUSTOM_MODELS，并提供可用的 API Key",
+      );
       return;
     }
 

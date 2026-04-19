@@ -1904,10 +1904,25 @@ export function Settings() {
               aria-label={Locale.Settings.Access.CustomModel.Title}
               style={{ width: "100%", maxWidth: "unset", textAlign: "left" }}
               type="text"
-              value={accessStore.customModels}
-              placeholder="请在 .env 中设置 CUSTOM_MODELS"
-              disabled
-              readOnly
+              value={
+                accessStore.useCustomConfig
+                  ? config.customModels
+                  : accessStore.customModels
+              }
+              placeholder={
+                accessStore.useCustomConfig
+                  ? "model1,model2,model3"
+                  : "请在 .env 中设置 CUSTOM_MODELS"
+              }
+              disabled={!accessStore.useCustomConfig}
+              readOnly={!accessStore.useCustomConfig}
+              onChange={(e) =>
+                accessStore.useCustomConfig
+                  ? config.update(
+                      (config) => (config.customModels = e.currentTarget.value),
+                    )
+                  : undefined
+              }
             ></input>
           </ListItem>
         </List>

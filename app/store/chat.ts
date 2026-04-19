@@ -135,7 +135,11 @@ function getSummarizeModel(
     const accessStore = useAccessStore.getState();
     const allModel = collectModelsWithDefaultModel(
       configStore.models,
-      normalizeCustomModels(accessStore.customModels),
+      normalizeCustomModels(
+        accessStore.useCustomConfig
+          ? configStore.customModels
+          : accessStore.customModels,
+      ),
       accessStore.defaultModel,
     );
     const summarizeModel = allModel.find(

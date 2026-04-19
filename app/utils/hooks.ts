@@ -11,7 +11,11 @@ export function useAllModels() {
       return [];
     }
 
-    const customModels = normalizeCustomModels(accessStore.customModels);
+    const customModels = normalizeCustomModels(
+      accessStore.useCustomConfig
+        ? configStore.customModels
+        : accessStore.customModels,
+    );
     if (!customModels) {
       return [];
     }
@@ -45,6 +49,7 @@ export function useAllModels() {
     accessStore.siliconflowApiKey,
     accessStore.ai302ApiKey,
     accessStore.useCustomConfig,
+    configStore.customModels,
     configStore.models,
   ]);
 
